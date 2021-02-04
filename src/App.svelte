@@ -1,8 +1,8 @@
 <script>
-    import { onMount } from 'svelte';
     import { fade, fly } from 'svelte/transition';
     import { HUB } from '@web-ict/hub'
     import { ICT } from '@web-ict/ict'
+    import { economicCluster } from '@web-ict/ec'
     import { trytes, trytesToTrits } from '@web-ict/converter'
     import { ISS } from '@web-ict/iss'
     import { ADDRESS_LENGTH } from '@web-ict/transaction'
@@ -13,6 +13,7 @@
     let seed
     let seedTrits = new Int8Array(243)
     let transfers = []
+    let balance = '0 i'
     let loggedIn = false
     let seedChecksum = ''
     let depositStep = 0
@@ -49,6 +50,20 @@
                 },
                 Curl729_27,
             })
+
+            const cluster = economicCluster({
+                intervalDuration: 5 * 1000,
+                ixi: ict.ixi,
+                Curl729_27,
+            })
+
+            cluster.addEconomicActor({
+                address: 'XTTLDRSNRPBPGESXAVBKKS9PMNCY9ZRTIZOZJUIYMGEBFRCQPOHCCONRX9JMBPCSYYKTOYIIEVYGGCTMR',
+                depth: 12,
+                security: 1,
+                weight: 1,
+            })
+
     
             trytesToTrits(seed, seedTrits, 0, 243)
 
@@ -60,24 +75,30 @@
                 security: 2,
                 persistencePath: './',
                 persistenceId: trytes(persistenceIdTrits, 0, persistenceIdTrits.length),
-                reattachIntervalDuration: 3 * 60 * 1000,
+                reattachIntervalDuration: 30 * 1000,
                 acceptanceThreshold: 100,
                 Curl729_27,
                 ixi: ict.ixi,
             })
 
             ict.launch()
+            cluster.launch()
             hub.launch()
 
             const interval = setInterval(async () => {
                 transfers = []
-                const { getTransfers } = await hub
-                getTransfers().forEach(transfer => transfers.push({
-                    address: trytes(transfer.input.address, 0, ADDRESS_LENGTH),
-                    value: transfer.input.balance,
-
-                }))
+                const { getTransfers, getBalance } = await hub
+                getTransfers().forEach(transfer => {
+                    if (transfer.input) {
+                        transfers.push({
+                            address: trytes(transfer.input.address, 0, ADDRESS_LENGTH),
+                            value: transfer.input.balance,
+                        })
+                    }
+                })
                 transfers = transfers
+
+                balance = formatValueWithHumanReadableUnit(getBalance().toString())
             }, 1000)
 
             loggedIn = true
@@ -126,6 +147,7 @@
             await withdraw({ address: withdrawalAddress, value: withdrawalValue })
             resetWithdrawDialog()
         } catch (error) {
+            console.log(error)
             withdrawalError = error.message
         }
     }
@@ -167,6 +189,7 @@
 <header>
     <img id="logo" src="/logo.png">
     {#if loggedIn}
+        <div id="balance">Balance: {balance}</div>
         <div id="actions">
             <button id="receive-button" on:click={() => (depositDialogVisible = true)}>Receive</button>
             <button id="send-button" on:click={() => (withdrawDialogVisible = true)}>Send</button>
@@ -284,6 +307,13 @@
         height: 2.5em;
         padding-left: 2em;
         filter: invert();
+    }
+
+    #balance {
+        font-size: 1.5em;
+        padding-top: 0.5em;
+        color: #fff;
+        font-family: monospace;   
     }
 
     #actions {
