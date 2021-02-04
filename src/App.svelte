@@ -6,14 +6,15 @@
     import { trytes, trytesToTrits } from '@web-ict/converter'
     import { ISS } from '@web-ict/iss'
     import { ADDRESS_LENGTH } from '@web-ict/transaction'
-
     
     export let name;
 
     let hub
     let seed
+    let seedTrits = new Int8Array(243)
     let transfers = []
     let loggedIn = false
+    let seedChecksum = ''
     let depositStep = 0
     let withdrawStep = 0
     let depositValue = 0
@@ -48,8 +49,7 @@
                 },
                 Curl729_27,
             })
-
-            const seedTrits = new Int8Array(243)
+    
             trytesToTrits(seed, seedTrits, 0, 243)
 
             const iss = ISS(Curl729_27)
@@ -84,6 +84,15 @@
 
             return hub
         })   
+    }
+
+    function updateSeedChecksum () {
+        import('@web-ict/curl').then(({ Curl729_27 }) => {
+            const hash = new Int8Array(243)
+            trytesToTrits(seed, seedTrits, 0, 243)
+            Curl729_27.get_digest(seedTrits, 0, 243, hash, 0)
+            seedChecksum = trytes(hash, 0, 243).slice(-3)
+        })
     }
 
     async function deposit() {
@@ -167,7 +176,8 @@
 <main>
     {#if !loggedIn}
         <label for="seed">Seed</label>
-        <input name="seed" type="password" bind:value={seed}>
+        <input name="seed" type="password" bind:value={seed} on:input={updateSeedChecksum}>
+        <span id="seed-checksum">{seedChecksum}</span>
         <button disabled='{seed === undefined}' on:click={init}>Login</button>
     {/if}
     {#each transfers as transfer}
