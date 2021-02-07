@@ -10,6 +10,7 @@ body {
 	margin: 0;
 	padding: 8px;
 	box-sizing: border-box;
+	font-family: 'Inconsolata', monospace;
 }
 
 a {
@@ -30,6 +31,7 @@ label {
 }
 
 input, button, select, textarea {
+	font-family: monospace;
 	font-family: inherit;
 	font-size: inherit;
 	background: #101010;
@@ -47,6 +49,10 @@ button {
 	color: #333;
 	background-color: #f4f4f4;
 	outline: none;
+}
+
+button:hover {
+	cursor: pointer;
 }
 
 button:disabled {
