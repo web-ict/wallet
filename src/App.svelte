@@ -131,7 +131,7 @@
 
     function updateSeedChecksum () {
         if (!new RegExp('^[9A-Z]{1,}$').test(seed)) {
-            seed = ''
+            seed = seed.slice(0, -1)
             return
         }
         import('@web-ict/curl').then(({ Curl729_27 }) => {
