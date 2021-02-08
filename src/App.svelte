@@ -130,6 +130,10 @@
     }
 
     function updateSeedChecksum () {
+        if (!new RegExp('^[9A-Z]{1,}$').test(seed)) {
+            seed = ''
+            return
+        }
         import('@web-ict/curl').then(({ Curl729_27 }) => {
             const hash = new Int8Array(243)
             trytesToTrits(seed, seedTrits, 0, 243)
