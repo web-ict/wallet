@@ -102,11 +102,8 @@
                 transfers = []
                 const { getTransfers, getBalance } = await hub
                 getTransfers().forEach(transfer => {
-                    if (transfer.input) {
-                        transfers.push({
-                            address: trytes(transfer.input.address, 0, ADDRESS_LENGTH),
-                            value: transfer.input.balance,
-                        })
+                    if (transfer.transactionObjects) {
+                        transfers.push(transfer.transactionObjects)
                     }
                 })
                 transfers = transfers
@@ -249,8 +246,14 @@
     {/if}
     {#each transfers as transfer}
 		<div class="transfer">
-			{transfer.address}, {transfer.value}
+            {#each transfer as transaction}
+                <div class="transaction">
+                    Address: {transaction.address}<br>
+                    Value: {transaction.value}
+                </div>
+            {/each}
         </div>
+        <br>
 	{/each}
 
     {#if depositDialogVisible}
