@@ -190,8 +190,8 @@
         units.set('Ki', 1_000)
         units.set('Mi', 1_000_000)
         units.set('Gi', 1_000_000_000)
-        units.set('Ti', 1_000_000_000_0000)
-        units.set('Pi', 1_000_000_000_0000_000)
+        units.set('Ti', 1_000_000_000_000)
+        units.set('Pi', 1_000_000_000_000_000)
 
         return value * units.get(unit)
     }
