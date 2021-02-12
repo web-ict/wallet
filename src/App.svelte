@@ -103,7 +103,7 @@
                 const { getTransfers, getBalance } = await hub
                 getTransfers().forEach(transfer => {
                     if (transfer.transactionObjects) {
-                        transfers.push(transfer.transactionObjects)
+                        transfers.push(transfer)
                     }
                 })
                 transfers = transfers
@@ -126,11 +126,13 @@
         hub.terminate()
     }
 
-    function updateSeedChecksum () {
+    let seed0 = seed
+    function updateSeedChecksum (event) {
         if (!new RegExp('^[9A-Z]{1,}$').test(seed)) {
-            seed = seed.slice(0, -1)
+            seed = seed0
             return
         }
+        seed0 = seed
         import('@web-ict/curl').then(({ Curl729_27 }) => {
             const hash = new Int8Array(243)
             trytesToTrits(seed, seedTrits, 0, 243)
@@ -170,7 +172,6 @@
             await withdraw({ address: withdrawalAddress, value: withdrawalValue })
             resetWithdrawDialog()
         } catch (error) {
-            console.log(error)
             withdrawalError = error.message
         }
     }
@@ -202,7 +203,7 @@
             value = value / 1000
             i++
         }
-        return `${value} ${units[i]}`
+        return `${value}${units[i]}`
     }
 
     let depositDialogVisible = false
@@ -245,11 +246,18 @@
         </form>
     {/if}
     {#each transfers as transfer}
-		<div class="transfer">
-            {#each transfer as transaction}
+		<div class="transfer card">
+            {#if transfer.attachments !== undefined}
+                {transfer.attachments[transfer.attachments.length -1]}
+            {/if}
+            {#each transfer.transactionObjects.filter(({value}) => !value.equals(0)) as transaction}
                 <div class="transaction">
-                    Address: {transaction.address}<br>
-                    Value: {transaction.value}
+                    <span class="transaction-address">
+                        {transaction.address}
+                    </span>
+                    <span class="transaction-value">
+                      {(transaction.value.greater(0) ? '+' : '-')}{formatValueWithHumanReadableUnit(transaction.value.abs())}
+                    </span>
                 </div>
             {/each}
         </div>
@@ -329,6 +337,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        z-index: 1000;
     }
     
     main {
@@ -439,11 +448,10 @@
     .card {
         background: #222;
         box-shadow: 0px 0px 20px rgba(0,0,0,.5);
-        border: 0px solid #efefef;
         border-radius: 10px;
         padding: 2em;
+        margin: 0;
         box-sizing: border-box;
-        max-width: 90%;
     }
 
     h2 {
@@ -481,6 +489,10 @@
         height: 100%;
         width: 100%;
         background: rgba(10,10,10,0.9)
+    }
+
+    .transfer {
+        font-size: 1.2em;
     }
 
 	@media (min-width: 640px) {
