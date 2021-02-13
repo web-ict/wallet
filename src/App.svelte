@@ -6,6 +6,11 @@
     import { trytes, trytesToTrits } from '@web-ict/converter'
     import { ISS } from '@web-ict/iss'
     import { ADDRESS_LENGTH } from '@web-ict/transaction'
+    import TimeAgo from 'javascript-time-ago'
+    import en from 'javascript-time-ago/locale/en'
+
+    TimeAgo.addDefaultLocale(en)
+    const timeAgo = new TimeAgo('en-US')
     
     export let name;
 
@@ -90,7 +95,9 @@
                 persistencePath: './',
                 persistenceId,
                 reattachIntervalDuration: 30 * 1000,
+                attachmentTimestampDelta: 1,
                 acceptanceThreshold: 100,
+                history: true,
                 Curl729_27,
                 ixi: ict.ixi,
             })
@@ -106,6 +113,7 @@
                         transfers.push(transfer)
                     }
                 })
+                transfers.sort((a, b) => b.transactionObjects[0].issuanceTimestamp - a.transactionObjects[0].issuanceTimestamp)
                 transfers = transfers
 
                 balance = formatValueWithHumanReadableUnit(getBalance().toString())
@@ -226,7 +234,7 @@
                 <div id="peers"><span id="online-{online}"></span> {numberOfPeers}/3 peers</div>
             </div>
             <div id="secondary-actions">
-                <button class="button-2">Cluster settings</button>
+                <button class="button-2">Settings</button>
                 <button class="button-2" on:click={logout}>Logout</button>
             </div>
         </div>
@@ -247,16 +255,34 @@
     {/if}
     {#each transfers as transfer}
 		<div class="transfer card">
-            {#if transfer.attachments !== undefined}
-                {transfer.attachments[transfer.attachments.length -1]}
-            {/if}
+            <div class="transfer-header">
+                <div>
+                    <span class="transfer-value">
+                        {(transfer.type === 'deposit' ? '+' : '-') + formatValueWithHumanReadableUnit(transfer.value)}
+                    </span>
+                    {#if transfer.attachments}
+                        <span class="latest-hash">
+                            {transfer.attachments[transfer.attachments.length -1]}
+                        </span>
+                    {/if}
+                </div>
+                <span class="transfer-inclusion-state {transfer.inclusionState ? 'transfer-inclusion-state-included' : 'transfer-inclusion-state-pending'}">
+                    {transfer.inclusionState ? 'Included' : 'Pending...'}
+                </span>
+            </div>
+            <div class="transfer-issuance-time">
+                {timeAgo.format(transfer.transactionObjects[0].issuanceTimestamp * 1000)}
+            </div>
             {#each transfer.transactionObjects.filter(({value}) => !value.equals(0)) as transaction}
                 <div class="transaction">
                     <span class="transaction-address">
                         {transaction.address}
                     </span>
                     <span class="transaction-value">
-                      {(transaction.value.greater(0) ? '+' : '-')}{formatValueWithHumanReadableUnit(transaction.value.abs())}
+                        {(transaction.value.greater(0) ? '+' : '-')}{formatValueWithHumanReadableUnit(transaction.value.abs())}
+                        {#if transfer.type === 'deposit' && !transfer.inclusionState && transaction.value.greater(0)}
+                            <button class="button-2" on:click={() => navigator.clipboard.writeText(transaction.address)}>Copy</button>
+                        {/if}
                     </span>
                 </div>
             {/each}
@@ -266,7 +292,7 @@
 
     {#if depositDialogVisible}
         <div class="dialog" transition:fade on:click={resetDepositDialog}>
-            <div class="card" transition:fly="{{ y: 100, duration: 300 }}" on:click={e => e.stopPropagation()}>
+            <div class="card padding-2" transition:fly="{{ y: 100, duration: 300 }}" on:click={e => e.stopPropagation()}>
                 <h2>Receive</h2>
                 <div>
                     {#if depositStep === 0}
@@ -297,7 +323,7 @@
     {/if}
     {#if withdrawDialogVisible}
         <div class="dialog" transition:fade on:click={resetWithdrawDialog}>
-            <div class="card" transition:fly="{{ y: 100, duration: 300 }}" on:click={e => e.stopPropagation()}>
+            <div class="card padding-2" transition:fly="{{ y: 100, duration: 300 }}" on:click={e => e.stopPropagation()}>
                 <h2>Send</h2>
                 {#if withdrawStep === 0}
                     <div id="withdrawal-step-1">
@@ -447,11 +473,15 @@
 
     .card {
         background: #222;
-        box-shadow: 0px 0px 20px rgba(0,0,0,.5);
-        border-radius: 10px;
-        padding: 2em;
+        box-shadow: 0px 0.2em 2em rgba(0,0,0,.2);
+        border-radius: 0.5em;
+        padding: 1em;
         margin: 0;
         box-sizing: border-box;
+    }
+
+    .padding-2 {
+        padding: 2em;
     }
 
     h2 {
@@ -492,7 +522,49 @@
     }
 
     .transfer {
+        max-width: 1100px;
+        margin: auto;
         font-size: 1.2em;
+    }
+
+    .transfer:hover {
+        background: #272727;
+    }
+
+    .transfer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+    }
+
+    .transfer-value {
+        color: rgba(255,255,255,0.9);
+        font-size: 1.5em;
+    }
+ 
+    .transfer-latest-hash {
+
+    }
+
+    .transfer-inclusion-state {
+        padding: 0.2em 0.5em;
+        font-size: 0.8em;
+        font-weight: 400;
+        color: rgba(255,255,255,0.9);
+        border-radius: 0.8em;
+    }
+
+    .transfer-inclusion-state-pending {
+        background: rgba(255,255,255, 0.3);
+    }
+
+    .transfer-inclusion-state-included {
+        background: green;
+    }
+
+    .transfer-issuance-time {
+        font-size: 0.8em;
+        padding: 0em 0 1em 0;
     }
 
 	@media (min-width: 640px) {

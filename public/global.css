@@ -11,6 +11,7 @@ body {
 	padding: 8px;
 	box-sizing: border-box;
 	font-family: 'Inconsolata', monospace;
+	font-weight: 300;
 }
 
 a {
@@ -49,6 +50,11 @@ button {
 	color: #333;
 	background-color: #f4f4f4;
 	outline: none;
+	font-weight: 300;
+}
+
+input[type=submit] {
+	font-weight: 300;
 }
 
 button:hover {
