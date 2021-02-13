@@ -23,7 +23,7 @@
     let transfers = []
     let balance = '0 i'
     let loggedIn = false
-    let seedChecksum = ''
+    let seedChecksum = '---'
     let depositStep = 0
     let withdrawStep = 0
     let depositValue = 0
@@ -136,17 +136,25 @@
 
     let seed0 = seed
     function updateSeedChecksum (event) {
-        if (!new RegExp('^[9A-Z]{1,}$').test(seed)) {
-            seed = seed0
-            return
+        if (event.inputType !== 'deleteContentBackward') {
+            if (!new RegExp('^[9A-Z]{1,}$').test(seed)) {
+                seed = seed0
+            } else {
+                seed0 = seed
+            }
+        } else {
+            seed0 = seed
         }
-        seed0 = seed
-        import('@web-ict/curl').then(({ Curl729_27 }) => {
-            const hash = new Int8Array(243)
-            trytesToTrits(seed, seedTrits, 0, 243)
-            Curl729_27.get_digest(seedTrits, 0, 243, hash, 0)
-            seedChecksum = trytes(hash, 0, 243).slice(-3)
-        })
+        if (seed === '') {
+            seedChecksum = '---'
+        } else {
+            import('@web-ict/curl').then(({ Curl729_27 }) => {
+                const hash = new Int8Array(243)
+                trytesToTrits(seed, seedTrits, 0, 243)
+                Curl729_27.get_digest(seedTrits, 0, 243, hash, 0)
+                seedChecksum = trytes(hash, 0, 243).slice(-3)
+            })
+        }
     }
 
     async function deposit() {
@@ -261,7 +269,7 @@
                         {(transfer.type === 'deposit' ? '+' : '-') + formatValueWithHumanReadableUnit(transfer.value)}
                     </span>
                     {#if transfer.attachments}
-                        <span class="latest-hash">
+                        <span class="transfer-latest-hash">
                             {transfer.attachments[transfer.attachments.length -1]}
                         </span>
                     {/if}
@@ -281,7 +289,7 @@
                     <span class="transaction-value">
                         {(transaction.value.greater(0) ? '+' : '-')}{formatValueWithHumanReadableUnit(transaction.value.abs())}
                         {#if transfer.type === 'deposit' && !transfer.inclusionState && transaction.value.greater(0)}
-                            <button class="button-2" on:click={() => navigator.clipboard.writeText(transaction.address)}>Copy</button>
+                            <button class="button-3" on:click={() => navigator.clipboard.writeText(transaction.address)}>Copy address</button>
                         {/if}
                     </span>
                 </div>
@@ -298,7 +306,7 @@
                     {#if depositStep === 0}
                         <form>
                             <label for="deposit-value">Value:</label>
-                            <input name="deposit-value" bind:value={depositValue} type="number" min="0">
+                            <input name="deposit-value" bind:value={depositValue} autofocus type="number" min="0">
                             <select name="deposit-unit" bind:value={depositUnit} class="unit">
                                 <option value="i">i</option>
                                 <option value="Ki">Ki</option>
@@ -329,7 +337,7 @@
                     <div id="withdrawal-step-1">
                         <form>
                             <label for="withdrawal-address">Address:</label>
-                            <input name="withdrawal-address" size="81" autocomplete="off" bind:value={withdrawalAddress} type="text">
+                            <input name="withdrawal-address" size="81" autocomplete="off" autofocus bind:value={withdrawalAddress} type="text">
                             <button class="button" disabled='{withdrawalAddress === ''}' on:click={getWithdrawalValue}>Next ❯</button>
                         </form>
                     </div>
@@ -337,7 +345,7 @@
                     <p>{withdrawalError}</p>
                     <button class="button" on:click={resetWithdrawDialog}>Close</button>
                 {:else if withdrawalValue !== undefined}
-                    <p>About to send {formatValueWithHumanReadableUnit(withdrawalValue)} to:</p>
+                    <p>About to send <b>{formatValueWithHumanReadableUnit(withdrawalValue)}</b> to:</p>
                     <p>{withdrawalAddress}</p>
                     <button class="button" on:click={resetWithdrawDialog}>Cancel</button>
                     <button class="button" on:click={withdraw}>Send ❯</button>
@@ -364,15 +372,19 @@
         justify-content: space-between;
         align-items: center;
         z-index: 1000;
+        box-shadow: 0px 0.2em 1em rgba(0,0,0,.5);
     }
     
     main {
         padding: 1em 2em;
         width: 100%;
-        margin: 6em auto 0 auto;
+        margin: 3em auto 0 auto;
         position: relative;
         top: 60px;
         box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        flex-direction: column;
     }
 
     main p, label {
@@ -452,19 +464,36 @@
         border: 0;
         border-radius: 1.2em;
         background: transparent;
+        border: 1px solid transparent;
         cursor: pointer;
-        transition: background-color 0.3s ease, color 0.3s ease;
+        transition: background-color 0.3s ease, color 0.3s ease, border 0.3s ease;
     }
 
     .button:hover {
-        color: #000;
-        background: #fff;
+        color: #fff;
+        background: rgba(4, 136, 130, .3);
+        border: 1px solid rgb(4, 136, 130);
     }
 
     .button-2 {
         background: transparent;
         border: 0;
         color: rgba(255,255,255,.7)
+    }
+
+    .button-3 {
+        background: transparent;
+        border: 1px solid transparent;
+        color: #fff;
+        font-size: 1em;
+        padding: 0.2em 0.6em;
+        border-radius: 1em;
+    }
+
+    .button-3:hover {
+        color: #fff;
+        background: rgba(4, 136, 130, .3);
+        border: 1px solid rgb(4, 136, 130);
     }
 
     .button-2:hover {
@@ -503,10 +532,12 @@
 
     select:focus {
         outline: 0;
+        border-bottom: 2px solid rgb(4, 136, 130);
     }
 
     input:focus {
         outline: none;
+        border-bottom: 2px solid rgb(4, 136, 130);
     }
 
     .dialog {
@@ -522,13 +553,12 @@
     }
 
     .transfer {
-        max-width: 1100px;
-        margin: auto;
+        width: 1100px;
         font-size: 1.2em;
     }
 
     .transfer:hover {
-        background: #272727;
+        background: #292929;
     }
 
     .transfer-header {
@@ -543,7 +573,7 @@
     }
  
     .transfer-latest-hash {
-
+        font-size: 0.9em;
     }
 
     .transfer-inclusion-state {
@@ -563,8 +593,14 @@
     }
 
     .transfer-issuance-time {
+        font-size: 0.7em;
+        padding: 1em 0 1em 0;
+        line-height: 160%;
+    }
+
+    .transaction {
         font-size: 0.8em;
-        padding: 0em 0 1em 0;
+        line-height: 160%;
     }
 
 	@media (min-width: 640px) {
