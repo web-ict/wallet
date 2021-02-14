@@ -28,51 +28,80 @@
     let withdrawStep = 0
     let depositValue = 0
     let depositUnit
-    let depositAddress = '9'.repeat(81) // TODO: add checksum
+    let depositAddress = '9'.repeat(81)
     let withdrawalAddress = ''
     let withdrawalValue = undefined
     let withdrawalError = undefined
     let info = {}
     let numberOfPeers = 0
     let online
+    let depositDialogVisible = false
+    let withdrawDialogVisible = false
+    let settingsDialogVisible = false
 
-    import('@web-ict/curl').then(({ Curl729_27 }) => {
-        ict = ICT({
-            autopeering: {
-                signalingServers: ['ws://116.203.136.136:8080', 'ws://116.203.136.136:8081', 'ws://116.203.136.136:8082'],
-                iceServers: [
-                    {
-                        urls: ['stun:stun3.l.google.com:19302'],
-                    },
-                ],
-                cooldownDuration:  10, // s
-                tiebreakerIntervalDuration:  10, // s
-                tiebreakerValue: Number.POSITIVE_INFINITY, // New transactions / second
-            },
-            dissemination: {
-                A: 1, // ms
-                B: 100,
-            },
-            subtangle: {
-                capacity: 1_000_000, // In transactions
-                pruningScale: 0.1, // In proportion to capacity
-                artificialLatency: 100, // ms
-            },
-            Curl729_27,
-        })
-        ict.launch()
+    let signalingServers = (localStorage.getItem('signalingServers') || 'ws://116.203.136.136:8080,ws://116.203.136.136:8081,ws://116.203.136.136:8082').split(',')
+    let signalingServer = ''
+    let iceServers = (localStorage.getItem('iceServers') || 'stun:stun3.l.google.com:19302').split(',')
+    let iceServer
+    let cooldownDuration = parseInt(localStorage.getItem('cooldownDuration')) || 10 // s
+    let tiebreakerIntervalDuration = parseInt(localStorage.getItem('tiebreakerIntervalDuration')) || 10 // s
+    let tiebreakerValue = parseInt(localStorage.getItem('tiebreakerValue')) || 100 // New transactions / second
+    let A = parseInt(localStorage.getItem('A')) || 1 // ms
+    let B = parseInt(localStorage.getItem('B')) || 100
+    let capacity = parseInt(localStorage.getItem('capacity')) || 1_000_000 // txs
+    let pruningScale = parseFloat(localStorage.getItem('prunningScale')) || 0.1 // In proportion to capacity
 
-        const step = () => {
-            info = ict.info()
-            numberOfPeers = info.peers.filter(peer => peer.uptime > 0).length
-            online = numberOfPeers > 0
+    function launchIct() {
+        import('@web-ict/curl').then(({ Curl729_27 }) => {
+            if (ict) {
+                ict.terminate()
+            }
+
+            ict = ICT({
+                autopeering: {
+                    signalingServers,
+                    iceServers: [{ urls: iceServers }],
+                    cooldownDuration,
+                    tiebreakerIntervalDuration,
+                    tiebreakerValue, 
+                },
+                dissemination: {
+                    A,
+                    B,
+                },
+                subtangle: {
+                    capacity,
+                    pruningScale,
+                    artificialLatency: 100, // ms
+                },
+                Curl729_27,
+            })
+            ict.launch()
+
+            const step = () => {
+                info = ict.info()
+                numberOfPeers = info.peers.filter(peer => peer.uptime > 0).length
+                online = numberOfPeers > 0
+                requestAnimationFrame(step)
+            }
             requestAnimationFrame(step)
-        }
-        requestAnimationFrame(step)
-    })
+        })
+    }
+
+    launchIct()
 
     function init() {
         import('@web-ict/curl').then(({ Curl729_27 }) => {
+            if (cluster !== undefined) {
+                cluster.terminate()
+            }
+
+            if (hub !== undefined) {
+                hub.terminate()
+            }
+
+            clearInterval(interval)
+
             cluster = economicCluster({
                 intervalDuration: 5 * 1000,
                 ixi: ict.ixi,
@@ -121,6 +150,21 @@
 
             loggedIn = true
         })   
+    }
+
+    function saveSettings() {
+        localStorage.setItem('signalingServers', signalingServers.join(','))
+        localStorage.setItem('iceServers', iceServers.join(','))
+        localStorage.setItem('cooldownDuration', cooldownDuration)
+        localStorage.setItem('tiebreakerIntervalDuration', tiebreakerIntervalDuration)
+        localStorage.setItem('tiebreakerValue', tiebreakerValue)
+        localStorage.setItem('A', A)
+        localStorage.setItem('B', B)
+        localStorage.setItem('capacity', capacity)
+        localStorage.setItem('prunningScale', pruningScale)
+        launchIct()
+        init()
+        settingsDialogVisible = false
     }
 
     function logout () {
@@ -200,6 +244,10 @@
         withdrawalError = undefined
     }
 
+    function closeSettingsDialog() {
+        settingsDialogVisible = false
+    }
+
     function calculateValueGivenUnit(value, unit) {
         const units = new Map()
         units.set('i', 1)
@@ -221,9 +269,6 @@
         }
         return `${value}${units[i]}`
     }
-
-    let depositDialogVisible = false
-    let withdrawDialogVisible = false
 </script>
 
 <header>
@@ -242,7 +287,7 @@
                 <div id="peers"><span id="online-{online}"></span> {numberOfPeers}/3 peers</div>
             </div>
             <div id="secondary-actions">
-                <button class="button-2">Settings</button>
+                <button class="button-2" on:click={() => (settingsDialogVisible = true)}>Settings</button>
                 <button class="button-2" on:click={logout}>Logout</button>
             </div>
         </div>
@@ -256,7 +301,7 @@
     {#if !loggedIn}
         <form>
             <label for="seed">Seed</label>
-            <input name="seed" type="password" size="81" autofocus bind:value={seed} on:input={updateSeedChecksum}>
+            <input name="seed" type="password" size="81" maxLength="81" autofocus bind:value={seed} on:input={updateSeedChecksum}>
             <span id="seed-checksum">{seedChecksum}</span>
             <input type="submit" class="button" disabled='{seed === undefined}' on:click={init} value="Login">
         </form>
@@ -356,6 +401,74 @@
             </div>
         </div>
     {/if}
+    {#if settingsDialogVisible}
+        <div class="dialog" transition:fade on:click={closeSettingsDialog}>
+            <div class="card padding-2" transition:fly="{{ y: 100, duration: 300 }}" on:click={e => e.stopPropagation()}>
+                <h2>Node settings</h2>
+                <div id="node-settings">
+                    <div class="settings">
+                        <h3>Peering</h3>
+                        <form>
+                            <h4>Signaling servers:</h4>
+                            {#each signalingServers as uri}
+                                <div>{uri} <button class="button-3" on:click={(e) => {
+                                    e.preventDefault()
+                                    const i = signalingServers.findIndex(value => value === uri)
+                                    signalingServers.splice(i, 1)
+                                    signalingServers = signalingServers
+                                }}>Delete</button></div>
+                            {/each}
+                            <input id="signaling-server" type="url" bind:value={signalingServer} placeholder="ws://...">
+                            <input type="submit" class="button-3" value="Add" on:click={(e) => {
+                                e.preventDefault()
+                                signalingServers = [...signalingServers, signalingServer]
+                                document.getElementById('signaling-server').value = ''
+                            }}>
+                        </form>
+                        <form>
+                            <h4>ICE servers:</h4>
+                            {#each iceServers as uri}
+                                <div>{uri}<button class="button-3" on:click={(e) => {
+                                    e.preventDefault()
+                                    const i = iceServers.findIndex(value => value === uri)
+                                    iceServers.splice(i, 1)
+                                    iceServers = iceServers
+                                }}>Delete</button></div>
+                            {/each}
+                            <input id="ice-server" type="url" bind:value={iceServer} placeholder="stun:...">
+                            <input type="submit" class="button-3" value="Add" on:click={(e) => {
+                                e.preventDefault()
+                                iceServers = [...iceServers, iceServer]
+                                document.getElementById('ice-server').value = ''
+                            }}>
+                        </form>
+                        <label for="cooldown-duration">Cooldown duration:</label>
+                        <input name="cooldown-duration" bind:value={cooldownDuration} type="number" min="0">
+                        <label for="tiebreaker-interval-duration">Tiebreaker interval duration:</label>
+                        <input name="tiebreaker-interval-duration" bind:value={tiebreakerIntervalDuration} type="number" min="1">
+                        <label for="tiebreaker-value">Tiebreaker value:</label>
+                        <input name="tiebreaker-value" bind:value={tiebreakerValue} type="number" min="50">
+                    </div>
+                    <div class="settings">
+                        <h3>Dissemination</h3>
+                        <label for="A">A:</label>
+                        <input name="A" bind:value={A} type="number" min="0">
+                        <label for="B">B:</label>
+                        <input name="B" bind:value={B} type="number" min="0">
+                    </div>
+                    <div class="settings">
+                        <h3>Subtangle</h3>
+                        <label for="capacity">Capacity:</label>
+                        <input name="capacity" bind:value={capacity} type="number" min="10000">
+                        <label for="pruning-scale">Pruning scale:</label>
+                        <input name="pruning-scale" bind:value={pruningScale} type="range" min="0.1" max="1" step="0.05">
+                    </div>
+                </div>
+                <button class="button node-settings-button" id="save-settings-button" on:click={saveSettings}>Save</button>
+                <button class="button node-settings-button" on:click={closeSettingsDialog}>Cancel</button>
+            </div>
+        </div>
+    {/if}
 </main>
 
 <style>
@@ -442,6 +555,7 @@
         background: #555;
         border-radius: 10px;
         transition: background-color 1s;
+        animation: connecting 1.2s infinite;
     }
 
     #online-true {
@@ -494,6 +608,7 @@
         color: #fff;
         background: rgba(4, 136, 130, .3);
         border: 1px solid rgb(4, 136, 130);
+        cursor: pointer;
     }
 
     .button-2:hover {
@@ -523,7 +638,6 @@
 
     input, select {
         padding: 0.6em 0em;
-        margin: 0.2em;
         font-size: 1.2em;
         border: 0;
         border-bottom: 2px solid rgba(255,255,255,0.5);
@@ -540,6 +654,10 @@
         border-bottom: 2px solid rgb(4, 136, 130);
     }
 
+    .button-3:focus {
+        border-bottom: 1px solid rgb(4, 136, 130);
+    }
+
     .dialog {
         position: fixed;
         display: flex;
@@ -549,6 +667,7 @@
         left: 0;
         height: 100%;
         width: 100%;
+        z-index: 1001;
         background: rgba(10,10,10,0.9)
     }
 
@@ -603,9 +722,52 @@
         line-height: 160%;
     }
 
+    #node-settings {
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+        padding-bottom: 2em;
+    }
+    
+    .settings {
+        padding: 0 1em;
+    }
+
+    #node-settings label {
+        margin-top: 1em;
+        font-size: 1em;
+    }
+
+    #node-settings input {
+        font-size: 1em;
+    }
+
+    .node-settings-button {
+        float: right;
+    }
+
+    #save-settings-button {
+        margin-left: 0.5em;
+    }
+
+    h3 {
+        font-weight: 300;
+        color: #fff;
+    }
+
+    h4 {
+        font-weight: 300;
+    }
+
 	@media (min-width: 640px) {
 		main {
 			max-width: none;
 		}
-	}
+    }
+    
+    @keyframes connecting {
+        50%  {
+            transform: scale(1.2);
+        }
+    }
 </style>
